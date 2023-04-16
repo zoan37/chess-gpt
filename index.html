@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vite + Vue + TS</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css"
+    integrity="sha384-q94+BZtLrkL1/ohfjR8c6L+A6qzNH9R2hBLwyoAfu3i/WCvQjzL2RQJ3uNHDISdU" crossorigin="anonymous">
+
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"
+    integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2"
+    crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"
+    integrity="sha384-8Vi8VHwn3vjQ9eUHUxex3JSN/NFqUg3QbPyX8kWyb93+8AC/pPWTzj+nHtbC5bxD"
+    crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.2/chess.js"
+    integrity="sha384-s3XgLpvmHyscVpijnseAmye819Ee3yaGa8NxstkJVyA6nuDFjt59u1QvuEl/mecz"
+    crossorigin="anonymous"></script>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-KK94CHFLLe+nY2dmCWGMq91rCGa5gtU4mk92HdvYe+M/SXH301p5ILy+dN9+nJOZ" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-ENjdO4Dr2bkBIFxQpeoTz1HIcje39Wm4jDKdf19U8gI4ddQ3GYNS7NTKfAdVQSZe"
+    crossorigin="anonymous"></script>
+
+  <style>
+    #chat_output {
+      width: 425px;
+      height: 225px;
+      overflow-y: scroll;
+      border: 1px solid #ccc;
+      background-color: rgb(240, 240, 240);
+      margin: auto;
+      padding: 5px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="col-md-8 mx-auto mb-4" style="width: 425px;">
+      <h1 class="mt-3 mb-3" style="text-align: center;">Chess GPT</h1>
+      <div id="myBoard" style="width: 425px; margin: auto;"></div>
+
+      <div id="chat_output" class="mt-3 mb-3">
+        <div id="chat_output_messages"></div>
+        <div id="chat_output_bottom"></div>
+      </div>
+
+      <p style="text-align: center;">
+        <button id="retry_move_button" type="button" class="btn btn-primary">Force Make Move</button>
+      </p>
+
+      <p>
+        <b>How to play:</b>
+      </p>
+      <ul>
+        <li>Install the <a href="https://windowai.io/" target="_blank">window.ai</a> Chrome extension to bring your own
+          LLM model.</li>
+        <li>You are white, and Chess GPT is black. Drag the pieces to make moves.</li>
+        <li>Click the "Force Make Move" button to force Chess GPT to make a move. For example, this can be used to retry if Chess GPT made an illegal move, or to make it play as white.</li>
+      </ul>
+
+      <p>
+        <a href="https://github.com/zoan37/chess-gpt" target="_blank">Source on GitHub</a>
+      </p>
+    </div>
+  </div>
+
+  <script type="module">
+    var board = null
+    var game = new Chess()
+
+    function onDragStart(source, piece, position, orientation) {
+      // do not pick up pieces if the game is over
+      if (game.game_over()) return false
+
+      // only pick up pieces for White
+      if (piece.search(/^b/) !== -1) return false
+    }
+
+    function scrollToBottom() {
+      document.getElementById('chat_output_bottom').scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'start'
+      });
+    }
+
+    async function makeMove() {
+      $('#chat_output_messages').append('<p>Thinking...</p>');
+      scrollToBottom();
+
+      var possibleMoves = game.moves()
+
+      // game over
+      if (possibleMoves.length === 0) return
+
+      // call window.ai
+      const prompt = `You are a chess engine.
+
+      The game history (in PGN format) is:
+      ${game.pgn()}
+
+      The board is in the following position (in FEN format):
+      ${game.fen()}
+
+      The legal moves are:
+      [${possibleMoves.join(", ")}]
+
+      Please reply in the format:
+
+      Move: your_move, Confidence: your_confidence, Move Explanation: your_move_explanation, Board Analysis: your_board_analysis
+
+      where your_move is your next move and must be in the list of legal moves above, your_confidence is a number between 0 and 1, and your_move_explanation is your explanation for your move, and your_board_analysis is your analysis of the board.
+      `;
+
+      if (!window.ai) {
+        alert("window.ai not found. Please install at https://windowai.io/");
+        return;
+      }
+
+      const response = await window.ai.getCompletion({
+        messages: [{role: "user", content: prompt}],
+      }, {
+        temperature: 0.5,
+      });
+
+      console.log('response', response);
+
+      // parse move from response (e.g. look for "Move: e5, Confidence: 0.9, Move Explanation: I like e5 because it's a good move, Board Analysis: I think the board is good for me"
+      const movePattern = /Move: (.+?),/;
+      const move = response.message.content.match(movePattern)[1];
+
+      // var randomIdx = Math.floor(Math.random() * possibleMoves.length)
+      game.move(move)
+      board.position(game.fen())
+
+      // Surround Move:, Confidence:, Move Explanation:, Board Analysis: with <b> tags
+      const htmlResponse = response.message.content = response.message.content.replace(/(Move:|Confidence:|Move Explanation:|Board Analysis:)/g, '<b>$1</b>');
+
+      $('#chat_output_messages').append('<p>' + htmlResponse + '</p>');
+      scrollToBottom();
+    }
+
+    function onDrop(source, target) {
+      // see if the move is legal
+      var move = game.move({
+        from: source,
+        to: target,
+        promotion: 'q' // NOTE: always promote to a queen for example simplicity
+      })
+
+      // illegal move
+      if (move === null) return 'snapback'
+
+      // make random legal move for black
+      window.setTimeout(makeMove, 10)
+    }
+
+    // update the board position after the piece snap
+    // for castling, en passant, pawn promotion
+    function onSnapEnd() {
+      board.position(game.fen())
+    }
+
+    var config = {
+      draggable: true,
+      position: 'start',
+      onDragStart: onDragStart,
+      onDrop: onDrop,
+      onSnapEnd: onSnapEnd
+    }
+    board = Chessboard('myBoard', config)
+
+    $(document).ready(function () {
+      $('#retry_move_button').click(function () {
+        makeMove();
+      });
+    });
+  </script>
+
+  <!--
+  <div id="app"></div>
+  <script type="module" src="/src/main.ts"></script>
+  -->
+</body>
+
+</html>
