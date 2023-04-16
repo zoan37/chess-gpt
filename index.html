@@ -100,7 +100,7 @@
       if (possibleMoves.length === 0) return
 
       // call window.ai
-      const prompt = `You are a chess engine.
+      const prompt = `You are a chess engine. You should play the best legal move.
 
       The game history (in PGN format) is:
       ${game.pgn()}
