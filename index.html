@@ -140,7 +140,7 @@
       board.position(game.fen())
 
       // Surround Move:, Confidence:, Move Explanation:, Board Analysis: with <b> tags
-      const htmlResponse = response.message.content = response.message.content.replace(/(Move:|Confidence:|Move Explanation:|Board Analysis:)/g, '<b>$1</b>');
+      const htmlResponse = response.message.content.replace(/(Move:|Confidence:|Move Explanation:|Board Analysis:)/g, '<b>$1</b>');
 
       $('#chat_output_messages').append('<p>' + htmlResponse + '</p>');
       scrollToBottom();
